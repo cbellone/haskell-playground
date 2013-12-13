@@ -1,9 +1,10 @@
 import System.Environment
 import System.IO
-import qualified System.Directory as Directory
+import System.Directory
+import System.Time
 
 data Package = Package { packageName :: String
-		       , size :: Int
+		       , fileSize :: Int
 		       , url :: String
 		       , timestamp :: Int
 		       } deriving (Show)
@@ -17,38 +18,35 @@ data Resource = Resource { resourceName :: String
 } deriving (Show)
 			 
 data PathDescriptor = PathDescriptor { pathName :: String
-				     , children :: [PathDescriptor]
-				     , lastModification :: Int
+				     , lastModification :: String
+				     , size :: Int
 } deriving (Show)
 
 
 main = do
   args <- getArgs
   let path = args !! 0
-  traverseDirectory path
+  fileDescriptor <- loadAllDescriptors path
+  return ()
 
+loadAllDescriptors :: String -> IO [PathDescriptor]
+loadAllDescriptors path = do
+  files <- getDirectoryContents path
+  mapM toDescriptor files
+  
+toDescriptor :: String -> IO PathDescriptor
+toDescriptor filePath = do
+  lastModification <- getLastModification filePath
+  return $ PathDescriptor filePath lastModification 0
 
-getRegularFiles :: [String] -> [String]
-getRegularFiles files =
-  filter isRegularFile files
-    
-getDirectories :: [String] -> [String]
-getDirectories files =
-  filter isDirectory files
-  
-isDirectory :: String -> Bool
-isDirectory [] = False
-isDirectory (_:"/") = True
-isDirectory _ = False
-  
-isRegularFile :: String -> Bool
-isRegularFile path = 
-  not $ isDirectory path
+getLastModification :: String -> IO String
+getLastModification filePath = do
+  exists <- doesFileExist filePath
+  if exists then
+     getFileLastModification filePath
+  else return "0"
 
-traverseDirectory :: String -> IO [Resource]
-traverseDirectory path = do
-  children <- Directory.getDirectoryContents path
-  return ((map toResource $ getRegularFiles children) ++ map traverseDirectory $ getDirectories children)
-  
-toResource :: String -> Resource
-toResource path = Resource { resourceName = path, versions = []}
+getFileLastModification :: String -> IO String
+getFileLastModification filePath = do
+  lastModification <- getModificationTime filePath
+  return $ show lastModification
